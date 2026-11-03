@@ -1,149 +1,105 @@
+#!/usr/bin/env python3
+"""Embed local images referenced in Markdown cells of a Jupyter notebook.
 
+Markdown images, ![alt](path), become cell attachments, ![alt](attachment:name).
+HTML images, <img src="path">, get base64 data URIs as src. Paths are relative
+to the notebook directory (the current directory when reading from stdin).
+Remote URLs, data URIs and existing attachments are left untouched. Use '-' as
+NOTEBOOK or OUTPUT to read from stdin or write to stdout.
+"""
 import argparse
 import base64
 import mimetypes
 import re
+import sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import nbformat
 
-
-# Markdown-Bilder und HTML-img-Tags erkennen
-MD_IMAGE = re.compile(r'(!\[[^\]]*\]\()([^)]+)(\))')
-HTML_IMAGE = re.compile(
-    r'(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(.*?)\2',
-    re.IGNORECASE
-)
+# ![alt](src) or ![alt](<src with spaces> "title"); groups: prefix, src, suffix
+MD_IMAGE = re.compile(r'(!\[[^\]]*\]\(\s*)(<[^>\n]*>|[^\s)]+)((?:\s+(?:"[^"]*"|\'[^\']*\'))?\s*\))')
+# <img ... src="..."> with quoted src; groups: prefix, quote, src
+HTML_IMAGE = re.compile(r'(<img\b[^>]*?\ssrc\s*=\s*)(["\'])(.*?)\2', re.IGNORECASE)
 
 
 def local_image(src, notebook_dir):
-    """Lokale Bilddatei bestimmen."""
-    src = src.strip()
+    """Return (path, mime type) of a local image, or None if src is not one."""
+    src = src.strip().removeprefix('<').removesuffix('>')
     parsed = urlsplit(src)
-
-    if parsed.scheme or parsed.netloc or src.startswith("#"):
+    if parsed.scheme or parsed.netloc or not parsed.path:
         return None
-
     path = notebook_dir / unquote(parsed.path)
-
-    if not path.is_file():
-        return None
-
     mime, _ = mimetypes.guess_type(path)
-
-    if not mime or not mime.startswith("image/"):
+    if not path.is_file() or not mime or not mime.startswith('image/'):
+        print(f'warning: not a local image file, left unchanged: {src}', file=sys.stderr)
         return None
-
     return path, mime
 
 
-def embed_images(input_file, output_file):
-    input_file = Path(input_file).resolve()
-    notebook_dir = input_file.parent
-
-    nb = nbformat.read(input_file, as_version=4)
-
-    count_md = 0
-    count_html = 0
+def embed_images(nb, notebook_dir):
+    """Embed local images in all Markdown cells of nb in place."""
+    n_md = n_html = 0
 
     for cell in nb.cells:
-        if cell.cell_type != "markdown":
+        if cell.cell_type != 'markdown':
             continue
+        attachments = cell.get('attachments', {})
 
-        attachments = cell.get("attachments", {})
-
-        # 1. Markdown-Bilder als Attachments
         def replace_md(match):
-            nonlocal count_md
-
-            src = match.group(2)
-            result = local_image(src, notebook_dir)
-
-            if result is None:
+            nonlocal n_md
+            image = local_image(match.group(2), notebook_dir)
+            if image is None:
                 return match.group(0)
+            path, mime = image
+            bundle = {mime: base64.b64encode(path.read_bytes()).decode('ascii')}
+            # Attachment names are unique per cell; spaces would break the link.
+            stem, suffix = path.stem.replace(' ', '_'), path.suffix
+            name, i = stem + suffix, 1
+            while name in attachments and attachments[name] != bundle:
+                name, i = f'{stem}_{i}{suffix}', i + 1
+            attachments[name] = bundle
+            n_md += 1
+            return f'{match.group(1)}attachment:{name}{match.group(3)}'
 
-            path, mime = result
-
-            encoded = base64.b64encode(
-                path.read_bytes()
-            ).decode("ascii")
-
-            # Eindeutiger Name innerhalb der Zelle
-            name = path.name
-            index = 1
-
-            while name in attachments:
-                name = f"{path.stem}_{index}{path.suffix}"
-                index += 1
-
-            attachments[name] = {mime: encoded}
-            count_md += 1
-
-            return (
-                match.group(1)
-                + "attachment:"
-                + name
-                + match.group(3)
-            )
-
-        source = MD_IMAGE.sub(replace_md, cell.source)
-
-        # 2. HTML-Bilder als Data-URIs
         def replace_html(match):
-            nonlocal count_html
-
-            src = match.group(3)
-            result = local_image(src, notebook_dir)
-
-            if result is None:
+            nonlocal n_html
+            image = local_image(match.group(3), notebook_dir)
+            if image is None:
                 return match.group(0)
+            path, mime = image
+            data = base64.b64encode(path.read_bytes()).decode('ascii')
+            n_html += 1
+            return f'{match.group(1)}{match.group(2)}data:{mime};base64,{data}{match.group(2)}'
 
-            path, mime = result
-
-            encoded = base64.b64encode(
-                path.read_bytes()
-            ).decode("ascii")
-
-            data_uri = f"data:{mime};base64,{encoded}"
-            count_html += 1
-
-            return (
-                match.group(1)
-                + match.group(2)
-                + data_uri
-                + match.group(2)
-            )
-
-        source = HTML_IMAGE.sub(replace_html, source)
-
-        cell.source = source
-
+        cell.source = HTML_IMAGE.sub(replace_html, MD_IMAGE.sub(replace_md, cell.source))
         if attachments:
             cell.attachments = attachments
 
-    nbformat.write(nb, output_file)
-
-    print(f"Markdown-Bilder: {count_md}")
-    print(f"HTML-Bilder:     {count_html}")
-    print(f"Gespeichert:     {output_file}")
+    return n_md, n_html
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("notebook")
-    parser.add_argument("-o", "--output")
-
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('notebook', help='input notebook')
+    parser.add_argument('-o', '--output',
+                        help='output notebook (default: NOTEBOOK_embedded.ipynb)')
     args = parser.parse_args()
 
-    input_path = Path(args.notebook)
+    if args.notebook == '-':
+        if args.output is None:
+            parser.error('-o/--output is required when reading from stdin')
+        nb, notebook_dir = nbformat.read(sys.stdin, as_version=4), Path.cwd()
+    else:
+        nb, notebook_dir = nbformat.read(args.notebook, as_version=4), Path(args.notebook).parent
+    output = args.output or Path(args.notebook).with_name(Path(args.notebook).stem + '_embedded.ipynb')
 
-    output_path = (
-        Path(args.output)
-        if args.output
-        else input_path.with_name(
-            input_path.stem + "_embedded.ipynb"
-        )
-    )
+    n_md, n_html = embed_images(nb, notebook_dir)
+    nbformat.write(nb, sys.stdout if output == '-' else output)
+    print(f'Embedded {n_md} Markdown and {n_html} HTML image(s); wrote {"stdout" if output == "-" else output}',
+          file=sys.stderr)
 
-    embed_images(input_path, output_path)
+
+if __name__ == '__main__':
+    main()

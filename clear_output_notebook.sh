@@ -1,16 +1,40 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Clear all cell outputs of Jupyter notebooks in place using jupyter nbconvert.
 
-# The script clears all output (from running cells) from a Notebook.
-# The original notebook is replaced by the cleaned version.
+set -euo pipefail
 
-# $1: Notebook to be cleaned
-# $2: COPYFLAG (optional), If a second argument 'COPY'
-#     is given, a copy of the notebook (appending .copy to
-#     the name is created before cleaning the original is replaced.
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [-b] NOTEBOOK...
 
-if [ ${#} -gt 1 ] && [ ${2} = "COPY" ]
-then
-  cp "${1}" "${1}".copy
+Clear all cell outputs of the given notebooks in place.
+
+Options:
+  -b, --backup  copy each notebook to NOTEBOOK.bak before clearing it
+  -h, --help    show this help message and exit
+EOF
+}
+
+backup=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -b|--backup) backup=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    -*) echo "error: unknown option: $1" >&2; usage >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+
+if [ $# -eq 0 ]; then
+  usage >&2
+  exit 2
 fi
 
-jupyter nbconvert --clear-output --inplace "${1}"
+if [ "$backup" = true ]; then
+  for nb in "$@"; do
+    cp -- "$nb" "$nb.bak"
+  done
+fi
+
+jupyter nbconvert --clear-output --inplace -- "$@"
