@@ -1,7 +1,6 @@
 # Examples
 
-A small exercise notebook to try the four tools without preparing your own
-material:
+A small exercise notebook to try the four tools without preparing your own material:
 
 - `exercise.ipynb`: teacher version of a short exercise ("sums of squares")
   with a saved output, a code solution cell (`## SOLUTION`), a Markdown
@@ -20,7 +19,7 @@ solutions, no outputs); step 4 extracts the images again.
 ## 1. Embed the images
 
 ```sh
-./embed_images.py examples/exercise.ipynb -o examples/generated/exercise_embedded.ipynb
+python ./embed_images.py examples/exercise.ipynb -o examples/generated/exercise_embedded.ipynb
 ```
 
 Generated: `examples/generated/exercise_embedded.ipynb`, which no longer needs
@@ -35,7 +34,7 @@ notebook: a notebook already written to `examples/generated/` would not find
 ## 2. Create a student version
 
 ```sh
-./create_student_notebook.py examples/generated/exercise_embedded.ipynb -o examples/generated/exercise_student.ipynb
+python ./create_student_notebook.py examples/generated/exercise_embedded.ipynb -o examples/generated/exercise_student.ipynb
 ```
 
 Generated: `examples/generated/exercise_student.ipynb`. It has 4 cells instead
@@ -50,7 +49,7 @@ there (see step 3).
 copy, not to `exercise.ipynb`:
 
 ```sh
-./clear_output_notebook.sh examples/generated/exercise_student.ipynb
+bash ./clear_output_notebook.sh examples/generated/exercise_student.ipynb
 ```
 
 Afterwards the code cells of `examples/generated/exercise_student.ipynb` have
@@ -60,7 +59,7 @@ notebook is now ready to hand out.
 ## 4. Extract images and restore local links
 
 ```sh
-./extract_images.py examples/generated/exercise_embedded.ipynb -d examples/generated/images -o examples/generated/exercise_restored.ipynb
+python ./extract_images.py examples/generated/exercise_embedded.ipynb -d examples/generated/images -o examples/generated/exercise_restored.ipynb
 ```
 
 Generated: `examples/generated/images/squares.png` and
