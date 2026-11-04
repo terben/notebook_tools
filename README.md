@@ -1,16 +1,29 @@
-# notebook_tools
+# Jupyter Notebook Tools
 
-Four small, independent command-line utilities for Jupyter notebooks:
+## Motivation
+
+When preparing Jupyter notebooks for teaching, I often need to create student-facing versions of my teaching materials. In particular, I want to:
+
+- **Remove cell outputs** before distributing notebooks, so students receive clean notebooks without results from previous executions.
+- **Remove solutions** from exercise notebooks while keeping them in the original notebooks used to prepare the course.
+- **Embed images directly into notebooks** so students can open them without having to manage additional image files.
+
+I originally wrote a few small scripts to automate these recurring tasks. Over time, they evolved into a collection of four command-line utilities.
+
+The tools are intentionally simple, independent, and designed to be combined in different workflows.
+
+## The Tools
+
+The collection currently consists of four small command-line utilities:
 
 | Tool | Purpose |
 | --- | --- |
 | `clear_output_notebook.sh` | Clear all cell outputs, **in place** |
 | `create_student_notebook.py` | Remove solution cells from an exercise notebook |
 | `embed_images.py` | Embed local images referenced in Markdown cells |
-| `extract_images.py` | Extract embedded images to files, optionally relinking them |
+| `extract_images.py` | Extract embedded images to files, optionally restoring local image links |
 
-Each tool is a single file with no dependencies on the others. Copy the ones
-you need and modify them as you like.
+Each tool is a standalone script with no dependencies on the other tools. You can use them individually, combine them in shell pipelines, or adapt them to your own teaching workflow.
 
 ## Prerequisites
 
