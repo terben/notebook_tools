@@ -44,102 +44,41 @@ git clone <repository-url> notebook_tools
 export PATH="$PWD/notebook_tools:$PATH"
 ```
 
-## Conventions
+## Quick reference
 
-- The input notebook is a positional argument; `-h`/`--help` shows usage.
-- `-o`/`--output` names the output notebook. Without it, the Python tools
-  write a new file next to the input (`NAME_student.ipynb`,
-  `NAME_embedded.ipynb`, `NAME_restored.ipynb`).
-- Source notebooks are never modified, except by `clear_output_notebook.sh`,
-  which works in place by design.
-- `create_student_notebook.py` and `embed_images.py` accept `-` as input or
-  output to read from stdin or write to stdout.
-- Status messages and warnings go to stderr.
+All four tools take a Jupyter notebook as their first argument. Use `-h` or `--help` for the full command-line options.
 
-## Usage
+| Tool | Example |
+| --- | --- |
+| `clear_output_notebook.sh` | `clear_output_notebook.sh -b lecture.ipynb` |
+| `create_student_notebook.py` | `create_student_notebook.py exercise.ipynb` |
+| `embed_images.py` | `embed_images.py lecture.ipynb` |
+| `extract_images.py` | `extract_images.py lecture_embedded.ipynb -r` |
 
-### clear_output_notebook.sh
+Some important conventions:
 
-```sh
-clear_output_notebook.sh lecture.ipynb               # clear in place
-clear_output_notebook.sh -b lecture.ipynb            # keep lecture.ipynb.bak
-clear_output_notebook.sh exercises/*.ipynb           # several notebooks
-```
+- `clear_output_notebook.sh` modifies notebooks **in place**. Use `-b` to create a backup.
+- `create_student_notebook.py` removes cells starting with `## SOLUTION` or `!! SOLUTION`.
+- `embed_images.py` converts local Markdown images into notebook attachments and HTML images into data URIs. Image paths are resolved relative to the input notebook.
+- `extract_images.py` writes embedded images to files. With `-r` or `-o`, it also creates a notebook with local image links.
+- For the Python tools, `-o` specifies the output notebook. Input notebooks are not modified by default.
+- `create_student_notebook.py` and `embed_images.py` support `-` for stdin/stdout, making shell pipelines possible.
 
-### create_student_notebook.py
-
-Removes every cell (code or Markdown) whose source starts with `## SOLUTION`
-or `!! SOLUTION`. The mark must be at the very beginning of the cell.
-
-```sh
-create_student_notebook.py sheet01.ipynb                     # -> sheet01_student.ipynb
-create_student_notebook.py sheet01.ipynb -o student/sheet01.ipynb
-```
-
-### embed_images.py
-
-Embeds local images so that the notebook is self-contained:
-
-- Markdown images `![alt](figures/plot.png)` become cell attachments,
-  `![alt](attachment:plot.png)`.
-- HTML images `<img src="figures/plot.png" width="300">` get a base64 data
-  URI as `src`, so that HTML attributes such as `width` keep working.
-
-Paths are resolved relative to the notebook's directory. Both
-`![alt](<my plot.png>)` and `![alt](my%20plot.png)` work, as do titles in
-double or single quotes (`![alt](plot.png "Title")`). Remote URLs, data URIs and existing attachments are left untouched.
-References to missing local files produce a warning and are left unchanged.
-
-```sh
-embed_images.py lecture.ipynb                        # -> lecture_embedded.ipynb
-embed_images.py lecture.ipynb -o handout.ipynb
-```
-
-### extract_images.py
-
-Writes attachments and HTML data-URI images of Markdown cells to image files.
-With `-r` or `-o`, it also writes a restored notebook in which the extracted
-images are referenced by links relative to the restored notebook (URL-encoded,
-e.g. `my%20images/plot.png`), so the image directory and the restored notebook
-may be in different directories. Without `-r` or `-o`, no notebook is written.
-
-```sh
-extract_images.py lecture_embedded.ipynb             # images -> lecture_embedded_images/
-extract_images.py lecture_embedded.ipynb -d figures  # images -> figures/
-extract_images.py lecture_embedded.ipynb -r          # also lecture_restored.ipynb
-extract_images.py lecture_embedded.ipynb -d figures -o lecture.ipynb
-```
-
-Attachments keep their names; HTML images are named `cell_NNN_image.EXT`.
-Attachments that are not referenced in their cell's Markdown are extracted
-but kept in the restored notebook. Existing files are never overwritten: name clashes get a
-numeric suffix (`image_1.png`), which also happens when you run the tool twice
-on the same image directory.
+Status messages and warnings are written to stderr.
 
 ## Examples
 
-[`examples/README.md`](examples/README.md) walks through all four tools with
-a small exercise notebook included in the repository.
+The [examples directory](examples/README.md) contains a small teaching notebook with exercises, solutions, saved outputs and local images.
 
-## Example workflows
+Its step-by-step guide demonstrates how to:
 
-Publish a self-contained student version of an exercise sheet. When reading
-from stdin, `embed_images.py` resolves image paths relative to the current
-directory, so run the pipeline from the notebook's directory:
+1. Embed local images into a self-contained notebook.
+2. Remove solution cells to create a student version.
+3. Clear saved cell outputs.
+4. Extract embedded images and restore local image links.
 
-```sh
-create_student_notebook.py sheet01.ipynb -o - | embed_images.py - -o sheet01_student.ipynb
-clear_output_notebook.sh sheet01_student.ipynb
-```
+All generated files are kept separate from the original example notebook.
 
-Edit the images of a notebook you received with embedded images, then
-re-embed them:
-
-```sh
-extract_images.py received.ipynb -d figures -o work.ipynb
-# ... edit figures/*.png, work on work.ipynb ...
-embed_images.py work.ipynb -o final.ipynb
-```
 
 ## Limitations
 

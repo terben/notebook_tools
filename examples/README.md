@@ -71,3 +71,20 @@ Running the command a second time adds files with a numeric suffix
 (`squares_1.png`) instead of overwriting.
 
 Without `-o` (or `-r`), only the images are extracted.
+
+## Optional: Combining tools in a pipeline
+
+`create_student_notebook.py` and `embed_images.py` can read notebooks from stdin and write them to stdout. This allows them to be combined without creating intermediate files.
+
+For example, run the following commands from the `examples/` directory:
+
+```sh
+python ../embed_images.py exercise.ipynb -o - \
+  | python ../create_student_notebook.py - -o generated/student_pipeline.ipynb
+
+bash ../clear_output_notebook.sh generated/student_pipeline.ipynb
+```
+
+The resulting notebook contains the exercise and embedded images, but no solution cells or saved outputs.
+
+Embedding is performed first because image paths must be resolved relative to the original notebook's directory.
