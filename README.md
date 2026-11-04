@@ -116,6 +116,11 @@ but kept in the restored notebook. Existing files are never overwritten: name cl
 numeric suffix (`image_1.png`), which also happens when you run the tool twice
 on the same image directory.
 
+## Examples
+
+[`examples/README.md`](examples/README.md) walks through all four tools with
+a small exercise notebook included in the repository.
+
 ## Example workflows
 
 Publish a self-contained student version of an exercise sheet. When reading
